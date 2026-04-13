@@ -115,7 +115,7 @@ export default function ProfilsPage() {
                 {label} ({unit})
               </label>
               <input
-                type="number"
+                type="number" onFocus={(e) => e.target.select()}
                 value={goals[activeTab][key]}
                 onChange={(e) =>
                   updateGoal(activeTab, key, parseFloat(e.target.value) || 0)

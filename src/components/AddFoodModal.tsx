@@ -101,7 +101,7 @@ export default function AddFoodModal({ onClose, onAdd }: AddFoodModalProps) {
                 {selected.type === 'ingredients' ? 'Quantité (g)' : 'Nombre de portions'}
               </label>
               <input
-                type="number"
+                type="number" onFocus={(e) => e.target.select()}
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
                 className="mt-1 w-full border border-slate-200 rounded-xl px-4 py-3 text-lg font-medium focus:outline-none focus:ring-2 focus:ring-green-400"

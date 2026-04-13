@@ -141,7 +141,7 @@ export default function RecettesPage() {
           <div>
             <label className="text-xs font-medium text-slate-500">Nombre de portions</label>
             <input
-              type="number"
+              type="number" onFocus={(e) => e.target.select()}
               min="1"
               value={form.servings}
               onChange={(e) => setForm((f) => ({ ...f, servings: parseInt(e.target.value) || 1 }))}
@@ -194,7 +194,7 @@ export default function RecettesPage() {
               <div key={ri.ingredient_id} className="flex items-center gap-2 mb-2">
                 <span className="flex-1 text-sm text-slate-700 truncate">{getIngName(ri.ingredient_id)}</span>
                 <input
-                  type="number"
+                  type="number" onFocus={(e) => e.target.select()}
                   value={ri.quantity}
                   onChange={(e) => updateIngQty(ri.ingredient_id, parseFloat(e.target.value) || 0)}
                   className="w-20 border border-slate-200 rounded-lg px-2 py-1 text-sm text-center focus:outline-none"
