@@ -8,27 +8,35 @@ import {
   useCallback,
   ReactNode,
 } from 'react'
+import { Session } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { Profile, Ingredient, Recipe, DayLog, DayType } from '@/lib/types'
 import { todayStr, generateId } from '@/lib/utils'
 
 type AppContextType = {
+  // Auth
+  session: Session | null
+  signIn: () => Promise<void>
+  signOut: () => Promise<void>
+
   // Profils
   profiles: Profile[]
   activeProfileId: string | null
   activeProfile: Profile | null
   setActiveProfileId: (id: string) => void
   refreshProfiles: () => Promise<void>
+  addProfile: (name: string) => Promise<void>
   updateProfile: (profile: Profile) => Promise<void>
+  deleteProfile: (id: string) => Promise<void>
 
-  // Ingrédients
+  // Ingrédients (partagés entre tous les utilisateurs)
   ingredients: Ingredient[]
   refreshIngredients: () => Promise<void>
   addIngredient: (ing: Omit<Ingredient, 'id'>) => Promise<void>
   updateIngredient: (ing: Ingredient) => Promise<void>
   deleteIngredient: (id: string) => Promise<void>
 
-  // Recettes
+  // Recettes (par utilisateur)
   recipes: Recipe[]
   refreshRecipes: () => Promise<void>
   addRecipe: (recipe: Omit<Recipe, 'id'>) => Promise<void>
@@ -51,6 +59,7 @@ const AppContext = createContext<AppContextType | null>(null)
 export function AppProvider({ children }: { children: ReactNode }) {
   const supabase = createClient()
 
+  const [session, setSession] = useState<Session | null>(null)
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [activeProfileId, setActiveProfileIdState] = useState<string | null>(null)
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
@@ -61,11 +70,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const activeProfile = profiles.find((p) => p.id === activeProfileId) ?? null
 
-  // Persister le profil actif dans localStorage
   const setActiveProfileId = useCallback((id: string) => {
     setActiveProfileIdState(id)
     localStorage.setItem('activeProfileId', id)
   }, [])
+
+  // ─── Auth ─────────────────────────────────────────────────────────────────
+
+  const signIn = useCallback(async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    })
+  }, [supabase])
+
+  const signOut = useCallback(async () => {
+    await supabase.auth.signOut()
+    setProfiles([])
+    setIngredients([])
+    setRecipes([])
+    setDayLog(null)
+    setActiveProfileIdState(null)
+    localStorage.removeItem('activeProfileId')
+  }, [supabase])
+
+  // ─── Profils ──────────────────────────────────────────────────────────────
 
   const refreshProfiles = useCallback(async () => {
     const { data } = await supabase.from('profiles').select('*').order('created_at')
@@ -76,7 +105,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         goals: p.goals,
       }))
       setProfiles(mapped)
-      // Restaurer le profil actif depuis localStorage
       const saved = localStorage.getItem('activeProfileId')
       if (saved && mapped.find((p) => p.id === saved)) {
         setActiveProfileIdState(saved)
@@ -85,6 +113,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }
   }, [supabase])
+
+  const addProfile = useCallback(
+    async (name: string) => {
+      const id = generateId()
+      await supabase.from('profiles').insert({
+        id,
+        name,
+        goals: {
+          training: { calories: 2500, proteins: 180, carbs: 250, fats: 80 },
+          rest: { calories: 2000, proteins: 150, carbs: 180, fats: 70 },
+        },
+      })
+      await refreshProfiles()
+      setActiveProfileId(id)
+    },
+    [supabase, refreshProfiles, setActiveProfileId]
+  )
 
   const updateProfile = useCallback(
     async (profile: Profile) => {
@@ -97,11 +142,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [supabase, refreshProfiles]
   )
 
+  const deleteProfile = useCallback(
+    async (id: string) => {
+      await supabase.from('profiles').delete().eq('id', id)
+      await refreshProfiles()
+    },
+    [supabase, refreshProfiles]
+  )
+
+  // ─── Ingrédients (partagés) ───────────────────────────────────────────────
+
   const refreshIngredients = useCallback(async () => {
-    const { data } = await supabase
-      .from('ingredients')
-      .select('*')
-      .order('name')
+    const { data } = await supabase.from('ingredients').select('*').order('name')
     if (data) setIngredients(data as Ingredient[])
   }, [supabase])
 
@@ -128,6 +180,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
     [supabase, refreshIngredients]
   )
+
+  // ─── Recettes (par utilisateur) ───────────────────────────────────────────
 
   const refreshRecipes = useCallback(async () => {
     const { data } = await supabase.from('recipes').select('*').order('name')
@@ -157,6 +211,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
     [supabase, refreshRecipes]
   )
+
+  // ─── Log du jour ──────────────────────────────────────────────────────────
 
   const refreshDayLog = useCallback(async () => {
     if (!activeProfileId) return
@@ -223,18 +279,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [activeProfileId, currentDate, dayLog, saveDayLog]
   )
 
-  // Chargement initial
+  // ─── Init et écoute de l'auth ─────────────────────────────────────────────
+
   useEffect(() => {
-    async function init() {
+    async function loadData() {
       setLoading(true)
       await Promise.all([refreshProfiles(), refreshIngredients(), refreshRecipes()])
       setLoading(false)
     }
-    init()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      if (session) loadData()
+      else setLoading(false)
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
+      setSession(newSession)
+      if (event === 'SIGNED_IN' && newSession) {
+        loadData()
+      } else if (event === 'SIGNED_OUT') {
+        setProfiles([])
+        setIngredients([])
+        setRecipes([])
+        setDayLog(null)
+        setActiveProfileIdState(null)
+        localStorage.removeItem('activeProfileId')
+      }
+    })
+
+    return () => subscription.unsubscribe()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Recharger le log quand le profil ou la date change
   useEffect(() => {
     if (activeProfileId) refreshDayLog()
   }, [activeProfileId, currentDate, refreshDayLog])
@@ -242,12 +321,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <AppContext.Provider
       value={{
+        session,
+        signIn,
+        signOut,
         profiles,
         activeProfileId,
         activeProfile,
         setActiveProfileId,
         refreshProfiles,
+        addProfile,
         updateProfile,
+        deleteProfile,
         ingredients,
         refreshIngredients,
         addIngredient,

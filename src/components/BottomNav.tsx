@@ -15,6 +15,8 @@ const navItems = [
 export default function BottomNav() {
   const pathname = usePathname()
 
+  if (pathname === '/login') return null
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50"
          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
