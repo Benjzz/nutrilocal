@@ -143,7 +143,7 @@ export default function RecettesPage() {
             <input
               type="number"
               min="1"
-              value={form.servings === 0 ? '' : form.servings}
+              value={form.servings}
               onChange={(e) => setForm((f) => ({ ...f, servings: parseInt(e.target.value) || 1 }))}
               className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
               placeholder="1"
@@ -196,7 +196,7 @@ export default function RecettesPage() {
                 <span className="flex-1 text-sm text-slate-700 truncate">{getIngName(ri.ingredient_id)}</span>
                 <input
                   type="number"
-                  value={ri.quantity === 0 ? '' : ri.quantity}
+                  value={ri.quantity || ''}
                   onChange={(e) => updateIngQty(ri.ingredient_id, parseFloat(e.target.value) || 0)}
                   className="w-20 border border-slate-200 rounded-lg px-2 py-1 text-sm text-center focus:outline-none"
                   placeholder="0"

@@ -6,17 +6,33 @@ import { useApp } from '@/context/AppContext'
 import ProfileSwitcher from '@/components/ProfileSwitcher'
 import { MacroGoal, Profile } from '@/lib/types'
 
-type GoalForm = {
-  training: MacroGoal
-  rest: MacroGoal
+type GoalStrings = { calories: string; proteins: string; carbs: string; fats: string }
+type GoalForm = { training: GoalStrings; rest: GoalStrings }
+
+function toStrings(g: MacroGoal): GoalStrings {
+  return {
+    calories: g.calories === 0 ? '' : String(g.calories),
+    proteins: g.proteins === 0 ? '' : String(g.proteins),
+    carbs: g.carbs === 0 ? '' : String(g.carbs),
+    fats: g.fats === 0 ? '' : String(g.fats),
+  }
+}
+
+function toNumbers(g: GoalStrings): MacroGoal {
+  return {
+    calories: parseFloat(g.calories) || 0,
+    proteins: parseFloat(g.proteins) || 0,
+    carbs: parseFloat(g.carbs) || 0,
+    fats: parseFloat(g.fats) || 0,
+  }
 }
 
 export default function ProfilsPage() {
   const { activeProfile, updateProfile } = useApp()
   const [name, setName] = useState('')
   const [goals, setGoals] = useState<GoalForm>({
-    training: { calories: 2500, proteins: 180, carbs: 250, fats: 80 },
-    rest: { calories: 2000, proteins: 150, carbs: 180, fats: 70 },
+    training: { calories: '', proteins: '', carbs: '', fats: '' },
+    rest: { calories: '', proteins: '', carbs: '', fats: '' },
   })
   const [saved, setSaved] = useState(false)
   const [activeTab, setActiveTab] = useState<'training' | 'rest'>('rest')
@@ -24,7 +40,10 @@ export default function ProfilsPage() {
   useEffect(() => {
     if (activeProfile) {
       setName(activeProfile.name)
-      setGoals(activeProfile.goals)
+      setGoals({
+        training: toStrings(activeProfile.goals.training),
+        rest: toStrings(activeProfile.goals.rest),
+      })
     }
   }, [activeProfile])
 
@@ -33,22 +52,18 @@ export default function ProfilsPage() {
     const updated: Profile = {
       ...activeProfile,
       name,
-      goals,
+      goals: {
+        training: toNumbers(goals.training),
+        rest: toNumbers(goals.rest),
+      },
     }
     await updateProfile(updated)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
 
-  function updateGoal(
-    type: 'training' | 'rest',
-    key: keyof MacroGoal,
-    value: number
-  ) {
-    setGoals((g) => ({
-      ...g,
-      [type]: { ...g[type], [key]: value },
-    }))
+  function updateGoal(type: 'training' | 'rest', key: keyof MacroGoal, value: string) {
+    setGoals((g) => ({ ...g, [type]: { ...g[type], [key]: value } }))
   }
 
   if (!activeProfile) return null
@@ -116,10 +131,8 @@ export default function ProfilsPage() {
               </label>
               <input
                 type="number"
-                value={goals[activeTab][key] === 0 ? '' : goals[activeTab][key]}
-                onChange={(e) =>
-                  updateGoal(activeTab, key, parseFloat(e.target.value) || 0)
-                }
+                value={goals[activeTab][key]}
+                onChange={(e) => updateGoal(activeTab, key, e.target.value)}
                 className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
                 placeholder="0"
               />

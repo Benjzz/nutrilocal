@@ -6,17 +6,25 @@ import DragScroll from '@/components/DragScroll'
 import { useApp } from '@/context/AppContext'
 import { Ingredient, INGREDIENT_CATEGORIES, IngredientCategory } from '@/lib/types'
 
-const EMPTY: Omit<Ingredient, 'id'> = {
-  name: '',
-  category: 'Autre',
-  calories: 0,
-  proteins: 0,
-  carbs: 0,
-  fats: 0,
-  unit: 'g',
+type FormData = {
+  name: string
+  category: IngredientCategory
+  calories: string
+  proteins: string
+  carbs: string
+  fats: string
+  unit: 'g' | 'ml' | 'piece'
 }
 
-type FormData = Omit<Ingredient, 'id'>
+const EMPTY: FormData = {
+  name: '',
+  category: 'Autre',
+  calories: '',
+  proteins: '',
+  carbs: '',
+  fats: '',
+  unit: 'g',
+}
 
 export default function AlimentsPage() {
   const { ingredients, addIngredient, updateIngredient, deleteIngredient } = useApp()
@@ -42,10 +50,10 @@ export default function AlimentsPage() {
     setForm({
       name: ing.name,
       category: ing.category,
-      calories: ing.calories,
-      proteins: ing.proteins,
-      carbs: ing.carbs,
-      fats: ing.fats,
+      calories: ing.calories === 0 ? '' : String(ing.calories),
+      proteins: ing.proteins === 0 ? '' : String(ing.proteins),
+      carbs: ing.carbs === 0 ? '' : String(ing.carbs),
+      fats: ing.fats === 0 ? '' : String(ing.fats),
       unit: ing.unit,
     })
     setEditing(ing)
@@ -59,10 +67,19 @@ export default function AlimentsPage() {
 
   async function handleSave() {
     if (!form.name.trim()) return
+    const data = {
+      name: form.name,
+      category: form.category,
+      calories: parseFloat(form.calories) || 0,
+      proteins: parseFloat(form.proteins) || 0,
+      carbs: parseFloat(form.carbs) || 0,
+      fats: parseFloat(form.fats) || 0,
+      unit: form.unit,
+    }
     if (editing) {
-      await updateIngredient({ ...editing, ...form })
+      await updateIngredient({ ...editing, ...data })
     } else {
-      await addIngredient(form)
+      await addIngredient(data)
     }
     closeForm()
   }
@@ -172,10 +189,8 @@ export default function AlimentsPage() {
                 <label className="text-xs font-medium text-slate-500">{label}</label>
                 <input
                   type="number"
-                  value={(form[key] as number) === 0 ? '' : (form[key] as number)}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, [key]: parseFloat(e.target.value) || 0 }))
-                  }
+                  value={form[key] as string}
+                  onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                   className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
                   placeholder="0"
                 />
