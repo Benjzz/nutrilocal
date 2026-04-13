@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react'
 import { Plus, Pencil, Trash2, X, Check, ChevronDown, ChevronUp, Search } from 'lucide-react'
 import { useApp } from '@/context/AppContext'
 import { Recipe, RecipeIngredient } from '@/lib/types'
-import { calculateRecipeMacros, generateId } from '@/lib/utils'
+import { calculateRecipeMacros, ingredientUnitLabel, ingredientDefaultQty } from '@/lib/utils'
 
 type RecipeForm = {
   name: string
@@ -72,9 +72,11 @@ export default function RecettesPage() {
 
   function addIngToForm(ingId: string) {
     if (form.ingredients.find((i) => i.type === 'ingredient' && i.ingredient_id === ingId)) return
+    const ing = ingredients.find((i) => i.id === ingId)
+    const defaultQty = ing ? ingredientDefaultQty(ing.unit) : 100
     setForm((f) => ({
       ...f,
-      ingredients: [...f.ingredients, { type: 'ingredient', ingredient_id: ingId, quantity: 100 }],
+      ingredients: [...f.ingredients, { type: 'ingredient', ingredient_id: ingId, quantity: defaultQty }],
     }))
     setShowPicker(false)
     setPickerSearch('')
@@ -246,8 +248,10 @@ export default function RecettesPage() {
                   className="w-20 border border-slate-200 rounded-lg px-2 py-1 text-sm text-center focus:outline-none"
                   placeholder="0"
                 />
-                <span className="text-xs text-slate-400 w-8">
-                  {ri.type === 'recipe' ? 'port.' : 'g'}
+                <span className="text-xs text-slate-400 w-12 text-right">
+                  {ri.type === 'recipe'
+                    ? 'port.'
+                    : ingredientUnitLabel(ingredients.find((i) => i.id === ri.ingredient_id)?.unit ?? 'g')}
                 </span>
                 <button onClick={() => removeItemFromForm(index)} className="text-slate-300 hover:text-red-400">
                   <X size={14} />
@@ -312,7 +316,10 @@ export default function RecettesPage() {
                       const label = ri.type === 'ingredient'
                         ? ingredients.find((i) => i.id === ri.ingredient_id)?.name ?? '?'
                         : recipes.find((r) => r.id === ri.recipe_id)?.name ?? '?'
-                      const unit = ri.type === 'recipe' ? `${ri.quantity} port.` : `${ri.quantity}g`
+                      const unitLabel = ri.type === 'recipe'
+                        ? 'port.'
+                        : ingredientUnitLabel(ingredients.find((i) => i.id === ri.ingredient_id)?.unit ?? 'g')
+                      const unit = `${ri.quantity} ${unitLabel}`
                       return (
                         <div key={idx} className="flex justify-between py-1 border-b border-slate-50 last:border-0">
                           <span className="text-sm text-slate-700">{label}</span>

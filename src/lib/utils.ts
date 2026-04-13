@@ -2,15 +2,30 @@ import { Ingredient, Recipe, MealItem, MacroTotals } from './types'
 
 export function calculateIngredientMacros(
   ingredient: Ingredient,
-  quantity: number // en grammes
+  quantity: number // dans l'unité native de l'ingrédient (g, ml, ou pièce)
 ): MacroTotals {
-  const ratio = quantity / 100
+  // Convertir en grammes pour le calcul
+  let grams = quantity
+  if (ingredient.unit === 'piece') {
+    grams = quantity * (ingredient.piece_weight ?? 100)
+  }
+  // ml traité comme g (densité ≈ 1)
+  const ratio = grams / 100
   return {
     calories: Math.round(ingredient.calories * ratio),
     proteins: Math.round(ingredient.proteins * ratio * 10) / 10,
     carbs: Math.round(ingredient.carbs * ratio * 10) / 10,
     fats: Math.round(ingredient.fats * ratio * 10) / 10,
   }
+}
+
+export function ingredientUnitLabel(unit: Ingredient['unit']): string {
+  if (unit === 'piece') return 'pièce(s)'
+  return unit
+}
+
+export function ingredientDefaultQty(unit: Ingredient['unit']): number {
+  return unit === 'piece' ? 1 : 100
 }
 
 export function calculateRecipeMacros(

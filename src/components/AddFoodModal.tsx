@@ -5,7 +5,7 @@ import { X, Search, ChevronRight } from 'lucide-react'
 import DragScroll from './DragScroll'
 import { useApp } from '@/context/AppContext'
 import { Ingredient, Recipe, INGREDIENT_CATEGORIES, IngredientCategory } from '@/lib/types'
-import { calculateIngredientMacros, calculateRecipeMacros } from '@/lib/utils'
+import { calculateIngredientMacros, calculateRecipeMacros, ingredientUnitLabel, ingredientDefaultQty } from '@/lib/utils'
 
 type Tab = 'ingredients' | 'recipes'
 
@@ -42,7 +42,10 @@ export default function AddFoodModal({ onClose, onAdd }: AddFoodModalProps) {
 
   function handleSelect(type: Tab, item: Ingredient | Recipe) {
     setSelected({ type, item })
-    setQuantity('')
+    const defaultQty = type === 'ingredients'
+      ? ingredientDefaultQty((item as Ingredient).unit)
+      : 1
+    setQuantity(String(defaultQty))
   }
 
   function handleAdd() {
@@ -98,7 +101,9 @@ export default function AddFoodModal({ onClose, onAdd }: AddFoodModalProps) {
 
             <div>
               <label className="text-sm font-medium text-slate-600">
-                {selected.type === 'ingredients' ? 'Quantité (g)' : 'Nombre de portions'}
+                {selected.type === 'ingredients'
+                  ? `Quantité (${ingredientUnitLabel((selected.item as Ingredient).unit)})`
+                  : 'Nombre de portions'}
               </label>
               <input
                 type="number"
