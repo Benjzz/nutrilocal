@@ -171,8 +171,8 @@ export default function AlimentsPage() {
               <div key={key}>
                 <label className="text-xs font-medium text-slate-500">{label}</label>
                 <input
-                  type="number" onFocus={(e) => e.target.select()}
-                  value={form[key] as number}
+                  type="number"
+                  value={(form[key] as number) === 0 ? '' : (form[key] as number)}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, [key]: parseFloat(e.target.value) || 0 }))
                   }

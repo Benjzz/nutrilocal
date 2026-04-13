@@ -42,7 +42,7 @@ export default function AddFoodModal({ onClose, onAdd }: AddFoodModalProps) {
 
   function handleSelect(type: Tab, item: Ingredient | Recipe) {
     setSelected({ type, item })
-    setQuantity(type === 'ingredients' ? '100' : '1')
+    setQuantity('')
   }
 
   function handleAdd() {
@@ -101,12 +101,13 @@ export default function AddFoodModal({ onClose, onAdd }: AddFoodModalProps) {
                 {selected.type === 'ingredients' ? 'Quantité (g)' : 'Nombre de portions'}
               </label>
               <input
-                type="number" onFocus={(e) => e.target.select()}
+                type="number"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
                 className="mt-1 w-full border border-slate-200 rounded-xl px-4 py-3 text-lg font-medium focus:outline-none focus:ring-2 focus:ring-green-400"
                 autoFocus
                 min="0"
+                placeholder="0"
               />
             </div>
 
