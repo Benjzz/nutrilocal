@@ -21,16 +21,25 @@ export default function RecettesPage() {
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState<RecipeForm>(EMPTY_FORM)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [ingSearch, setIngSearch] = useState('')
-  const [showIngPicker, setShowIngPicker] = useState(false)
+  const [pickerSearch, setPickerSearch] = useState('')
+  const [showPicker, setShowPicker] = useState(false)
+  const [pickerTab, setPickerTab] = useState<'ingredient' | 'recipe'>('ingredient')
 
   const filtered = recipes.filter((r) =>
     r.name.toLowerCase().includes(search.toLowerCase())
   )
 
   const filteredIngredients = useMemo(
-    () => ingredients.filter((i) => i.name.toLowerCase().includes(ingSearch.toLowerCase())),
-    [ingredients, ingSearch]
+    () => ingredients.filter((i) => i.name.toLowerCase().includes(pickerSearch.toLowerCase())),
+    [ingredients, pickerSearch]
+  )
+
+  const filteredSubRecipes = useMemo(
+    () => recipes.filter((r) =>
+      r.name.toLowerCase().includes(pickerSearch.toLowerCase()) &&
+      r.id !== editing?.id // éviter de s'ajouter soi-même
+    ),
+    [recipes, pickerSearch, editing]
   )
 
   function openAdd() {
@@ -48,7 +57,7 @@ export default function RecettesPage() {
   function closeForm() {
     setAdding(false)
     setEditing(null)
-    setShowIngPicker(false)
+    setShowPicker(false)
   }
 
   async function handleSave() {
@@ -62,33 +71,42 @@ export default function RecettesPage() {
   }
 
   function addIngToForm(ingId: string) {
-    if (form.ingredients.find((i) => i.ingredient_id === ingId)) return
+    if (form.ingredients.find((i) => i.type === 'ingredient' && i.ingredient_id === ingId)) return
     setForm((f) => ({
       ...f,
-      ingredients: [...f.ingredients, { ingredient_id: ingId, quantity: 100 }],
+      ingredients: [...f.ingredients, { type: 'ingredient', ingredient_id: ingId, quantity: 100 }],
     }))
-    setShowIngPicker(false)
-    setIngSearch('')
+    setShowPicker(false)
+    setPickerSearch('')
   }
 
-  function updateIngQty(ingId: string, qty: number) {
+  function addSubRecipeToForm(recipeId: string) {
+    if (form.ingredients.find((i) => i.type === 'recipe' && i.recipe_id === recipeId)) return
     setForm((f) => ({
       ...f,
-      ingredients: f.ingredients.map((i) =>
-        i.ingredient_id === ingId ? { ...i, quantity: qty } : i
-      ),
+      ingredients: [...f.ingredients, { type: 'recipe', recipe_id: recipeId, quantity: 1 }],
     }))
+    setShowPicker(false)
+    setPickerSearch('')
   }
 
-  function removeIngFromForm(ingId: string) {
+  function updateItemQty(index: number, qty: number) {
     setForm((f) => ({
       ...f,
-      ingredients: f.ingredients.filter((i) => i.ingredient_id !== ingId),
+      ingredients: f.ingredients.map((item, i) => i === index ? { ...item, quantity: qty } : item),
     }))
   }
 
-  function getIngName(id: string) {
-    return ingredients.find((i) => i.id === id)?.name ?? '?'
+  function removeItemFromForm(index: number) {
+    setForm((f) => ({
+      ...f,
+      ingredients: f.ingredients.filter((_, i) => i !== index),
+    }))
+  }
+
+  function getItemLabel(ri: RecipeIngredient): string {
+    if (ri.type === 'ingredient') return ingredients.find((i) => i.id === ri.ingredient_id)?.name ?? '?'
+    return recipes.find((r) => r.id === ri.recipe_id)?.name ?? '?'
   }
 
   return (
@@ -150,12 +168,12 @@ export default function RecettesPage() {
             />
           </div>
 
-          {/* Ingredients */}
+          {/* Composition */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-medium text-slate-500">Ingrédients</label>
+              <label className="text-xs font-medium text-slate-500">Composition</label>
               <button
-                onClick={() => setShowIngPicker(!showIngPicker)}
+                onClick={() => setShowPicker(!showPicker)}
                 className="text-xs text-green-500 font-medium flex items-center gap-1"
               >
                 <Plus size={12} />
@@ -163,53 +181,82 @@ export default function RecettesPage() {
               </button>
             </div>
 
-            {showIngPicker && (
+            {showPicker && (
               <div className="border border-slate-200 rounded-xl overflow-hidden mb-2">
+                {/* Tabs */}
+                <div className="flex border-b border-slate-100">
+                  {(['ingredient', 'recipe'] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setPickerTab(t)}
+                      className={`flex-1 py-1.5 text-xs font-medium transition-colors ${
+                        pickerTab === t ? 'bg-green-500 text-white' : 'text-slate-500'
+                      }`}
+                    >
+                      {t === 'ingredient' ? 'Aliment' : 'Recette'}
+                    </button>
+                  ))}
+                </div>
                 <div className="flex items-center gap-2 px-3 py-2 bg-slate-50">
                   <Search size={14} className="text-slate-400" />
                   <input
                     type="text"
                     placeholder="Chercher..."
-                    value={ingSearch}
-                    onChange={(e) => setIngSearch(e.target.value)}
+                    value={pickerSearch}
+                    onChange={(e) => setPickerSearch(e.target.value)}
                     className="flex-1 text-xs bg-transparent focus:outline-none"
                     autoFocus
                   />
                 </div>
                 <div className="max-h-36 overflow-y-auto">
-                  {filteredIngredients.map((ing) => (
-                    <button
-                      key={ing.id}
-                      onClick={() => addIngToForm(ing.id)}
-                      disabled={!!form.ingredients.find((i) => i.ingredient_id === ing.id)}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-40 border-t border-slate-50"
-                    >
-                      {ing.name}
-                    </button>
-                  ))}
+                  {pickerTab === 'ingredient'
+                    ? filteredIngredients.map((ing) => (
+                        <button
+                          key={ing.id}
+                          onClick={() => addIngToForm(ing.id)}
+                          disabled={!!form.ingredients.find((i) => i.type === 'ingredient' && i.ingredient_id === ing.id)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-40 border-t border-slate-50"
+                        >
+                          {ing.name}
+                        </button>
+                      ))
+                    : filteredSubRecipes.map((r) => (
+                        <button
+                          key={r.id}
+                          onClick={() => addSubRecipeToForm(r.id)}
+                          disabled={!!form.ingredients.find((i) => i.type === 'recipe' && i.recipe_id === r.id)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-40 border-t border-slate-50"
+                        >
+                          {r.name}
+                          <span className="ml-1 text-xs text-slate-400">({r.servings} portion{r.servings > 1 ? 's' : ''})</span>
+                        </button>
+                      ))
+                  }
                 </div>
               </div>
             )}
 
-            {form.ingredients.map((ri) => (
-              <div key={ri.ingredient_id} className="flex items-center gap-2 mb-2">
-                <span className="flex-1 text-sm text-slate-700 truncate">{getIngName(ri.ingredient_id)}</span>
+            {form.ingredients.map((ri, index) => (
+              <div key={index} className="flex items-center gap-2 mb-2">
+                <span className="flex-1 text-sm text-slate-700 truncate">{getItemLabel(ri)}</span>
                 <input
                   type="number"
                   value={ri.quantity || ''}
-                  onChange={(e) => updateIngQty(ri.ingredient_id, parseFloat(e.target.value) || 0)}
+                  onChange={(e) => updateItemQty(index, parseFloat(e.target.value) || 0)}
                   className="w-20 border border-slate-200 rounded-lg px-2 py-1 text-sm text-center focus:outline-none"
                   placeholder="0"
                 />
-                <span className="text-xs text-slate-400">g</span>
-                <button onClick={() => removeIngFromForm(ri.ingredient_id)} className="text-slate-300 hover:text-red-400">
+                <span className="text-xs text-slate-400 w-8">
+                  {ri.type === 'recipe' ? 'port.' : 'g'}
+                </span>
+                <button onClick={() => removeItemFromForm(index)} className="text-slate-300 hover:text-red-400">
                   <X size={14} />
                 </button>
               </div>
             ))}
 
             {form.ingredients.length === 0 && (
-              <p className="text-xs text-slate-400 text-center py-2">Aucun ingrédient</p>
+              <p className="text-xs text-slate-400 text-center py-2">Aucun élément</p>
             )}
           </div>
 
@@ -232,7 +279,7 @@ export default function RecettesPage() {
           </p>
         ) : (
           filtered.map((recipe) => {
-            const macros = calculateRecipeMacros(recipe, ingredients, 1)
+            const macros = calculateRecipeMacros(recipe, ingredients, recipes, 1)
             const expanded = expandedId === recipe.id
             return (
               <div key={recipe.id} className="bg-white rounded-2xl shadow-sm overflow-hidden">
@@ -261,12 +308,15 @@ export default function RecettesPage() {
                 {expanded && (
                   <div className="border-t border-slate-50 px-4 py-2">
                     <p className="text-xs font-medium text-slate-500 mb-1">{recipe.servings} portion{recipe.servings > 1 ? 's' : ''} au total</p>
-                    {recipe.ingredients.map((ri) => {
-                      const ing = ingredients.find((i) => i.id === ri.ingredient_id)
+                    {recipe.ingredients.map((ri, idx) => {
+                      const label = ri.type === 'ingredient'
+                        ? ingredients.find((i) => i.id === ri.ingredient_id)?.name ?? '?'
+                        : recipes.find((r) => r.id === ri.recipe_id)?.name ?? '?'
+                      const unit = ri.type === 'recipe' ? `${ri.quantity} port.` : `${ri.quantity}g`
                       return (
-                        <div key={ri.ingredient_id} className="flex justify-between py-1 border-b border-slate-50 last:border-0">
-                          <span className="text-sm text-slate-700">{ing?.name ?? '?'}</span>
-                          <span className="text-xs text-slate-400">{ri.quantity}g</span>
+                        <div key={idx} className="flex justify-between py-1 border-b border-slate-50 last:border-0">
+                          <span className="text-sm text-slate-700">{label}</span>
+                          <span className="text-xs text-slate-400">{unit}</span>
                         </div>
                       )
                     })}

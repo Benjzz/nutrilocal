@@ -16,15 +16,26 @@ export function calculateIngredientMacros(
 export function calculateRecipeMacros(
   recipe: Recipe,
   ingredients: Ingredient[],
+  recipes: Recipe[],
   servings: number
 ): MacroTotals {
   const ingredientMap = new Map(ingredients.map((i) => [i.id, i]))
+  const recipeMap = new Map(recipes.map((r) => [r.id, r]))
   const totals = { calories: 0, proteins: 0, carbs: 0, fats: 0 }
 
   for (const ri of recipe.ingredients) {
-    const ing = ingredientMap.get(ri.ingredient_id)
-    if (!ing) continue
-    const macros = calculateIngredientMacros(ing, ri.quantity)
+    let macros: MacroTotals
+    if (ri.type === 'ingredient') {
+      const ing = ingredientMap.get(ri.ingredient_id)
+      if (!ing) continue
+      macros = calculateIngredientMacros(ing, ri.quantity)
+    } else {
+      const subRecipe = recipeMap.get(ri.recipe_id)
+      if (!subRecipe) continue
+      // Éviter les récursions infinies (une recette ne peut pas se contenir elle-même)
+      if (subRecipe.id === recipe.id) continue
+      macros = calculateRecipeMacros(subRecipe, ingredients, recipes, ri.quantity)
+    }
     totals.calories += macros.calories
     totals.proteins += macros.proteins
     totals.carbs += macros.carbs
@@ -58,7 +69,7 @@ export function calculateItemMacros(
   } else {
     const recipe = recipes.find((r) => r.id === item.ref_id)
     if (!recipe) return { calories: 0, proteins: 0, carbs: 0, fats: 0 }
-    return calculateRecipeMacros(recipe, ingredients, item.quantity)
+    return calculateRecipeMacros(recipe, ingredients, recipes, item.quantity)
   }
 }
 

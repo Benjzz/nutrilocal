@@ -41,10 +41,9 @@ export type Ingredient = {
   piece_weight?: number // poids en g si unit = 'piece'
 }
 
-export type RecipeIngredient = {
-  ingredient_id: string
-  quantity: number // en grammes
-}
+export type RecipeIngredient =
+  | { type: 'ingredient'; ingredient_id: string; quantity: number }   // en grammes
+  | { type: 'recipe';     recipe_id: string;     quantity: number }   // en portions
 
 export type Recipe = {
   id: string

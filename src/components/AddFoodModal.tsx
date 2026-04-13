@@ -65,9 +65,9 @@ export default function AddFoodModal({ onClose, onAdd }: AddFoodModalProps) {
     if (selected.type === 'ingredients') {
       return calculateIngredientMacros(selected.item as Ingredient, qty)
     } else {
-      return calculateRecipeMacros(selected.item as Recipe, ingredients, qty)
+      return calculateRecipeMacros(selected.item as Recipe, ingredients, recipes, qty)
     }
-  }, [selected, quantity, ingredients])
+  }, [selected, quantity, ingredients, recipes])
 
   return (
     <div className="fixed inset-0 z-50 flex items-end" onClick={onClose}>
