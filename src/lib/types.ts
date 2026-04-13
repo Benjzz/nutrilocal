@@ -23,6 +23,7 @@ export const INGREDIENT_CATEGORIES = [
   'Fruits',
   'Produits laitiers',
   'Matières grasses',
+  'Assaisonnements',
   'Boissons',
   'Autre',
 ] as const
