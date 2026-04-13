@@ -21,6 +21,7 @@ export default function RecettesPage() {
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState<RecipeForm>(EMPTY_FORM)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [previewServings, setPreviewServings] = useState<Record<string, number>>({})
   const [pickerSearch, setPickerSearch] = useState('')
   const [showPicker, setShowPicker] = useState(false)
   const [pickerTab, setPickerTab] = useState<'ingredient' | 'recipe'>('ingredient')
@@ -283,18 +284,21 @@ export default function RecettesPage() {
           </p>
         ) : (
           filtered.map((recipe) => {
-            const macros = calculateRecipeMacros(recipe, ingredients, recipes, 1)
             const expanded = expandedId === recipe.id
+            const servings = previewServings[recipe.id] ?? 1
+            const macros = calculateRecipeMacros(recipe, ingredients, recipes, servings)
+            const perPortionMacros = calculateRecipeMacros(recipe, ingredients, recipes, 1)
+
             return (
               <div key={recipe.id} className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                <button
+                <div
                   onClick={() => setExpandedId(expanded ? null : recipe.id)}
-                  className="w-full flex items-center justify-between px-4 py-3"
+                  className="w-full flex items-center justify-between px-4 py-3 cursor-pointer"
                 >
                   <div className="text-left">
                     <p className="font-medium text-slate-800 text-sm">{recipe.name}</p>
                     <p className="text-xs text-slate-400">
-                      {macros.calories} kcal · P {macros.proteins}g · G {macros.carbs}g · L {macros.fats}g
+                      {perPortionMacros.calories} kcal · P {perPortionMacros.proteins}g · G {perPortionMacros.carbs}g · L {perPortionMacros.fats}g
                       <span className="ml-1 text-slate-300">/ portion</span>
                     </p>
                   </div>
@@ -307,26 +311,59 @@ export default function RecettesPage() {
                     </button>
                     {expanded ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
                   </div>
-                </button>
+                </div>
 
                 {expanded && (
-                  <div className="border-t border-slate-50 px-4 py-2">
-                    <p className="text-xs font-medium text-slate-500 mb-1">{recipe.servings} portion{recipe.servings > 1 ? 's' : ''} au total</p>
-                    {recipe.ingredients.map((ri, idx) => {
-                      const label = ri.type === 'ingredient'
-                        ? ingredients.find((i) => i.id === ri.ingredient_id)?.name ?? '?'
-                        : recipes.find((r) => r.id === ri.recipe_id)?.name ?? '?'
-                      const unitLabel = ri.type === 'recipe'
-                        ? 'port.'
-                        : ingredientUnitLabel(ingredients.find((i) => i.id === ri.ingredient_id)?.unit ?? 'g')
-                      const unit = `${ri.quantity} ${unitLabel}`
-                      return (
-                        <div key={idx} className="flex justify-between py-1 border-b border-slate-50 last:border-0">
-                          <span className="text-sm text-slate-700">{label}</span>
-                          <span className="text-xs text-slate-400">{unit}</span>
+                  <div className="border-t border-slate-100 px-4 py-3 space-y-3">
+                    {/* Sélecteur de portions */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-slate-500">Portions</span>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setPreviewServings((p) => ({ ...p, [recipe.id]: Math.max(1, (p[recipe.id] ?? 1) - 1) }))}
+                          className="w-7 h-7 rounded-full bg-slate-100 text-slate-600 font-bold text-sm flex items-center justify-center hover:bg-slate-200"
+                        >−</button>
+                        <span className="text-sm font-semibold text-slate-800 w-4 text-center">{servings}</span>
+                        <button
+                          onClick={() => setPreviewServings((p) => ({ ...p, [recipe.id]: (p[recipe.id] ?? 1) + 1 }))}
+                          className="w-7 h-7 rounded-full bg-green-500 text-white font-bold text-sm flex items-center justify-center hover:bg-green-600"
+                        >+</button>
+                      </div>
+                    </div>
+
+                    {/* Macros pour les portions sélectionnées */}
+                    <div className="grid grid-cols-4 gap-2">
+                      {[
+                        { label: 'Kcal', value: macros.calories, color: 'text-orange-500' },
+                        { label: 'Prot', value: macros.proteins, color: 'text-blue-500' },
+                        { label: 'Gluc', value: macros.carbs, color: 'text-amber-500' },
+                        { label: 'Lip', value: macros.fats, color: 'text-pink-500' },
+                      ].map(({ label, value, color }) => (
+                        <div key={label} className="bg-slate-50 rounded-xl p-2 text-center">
+                          <div className={`text-sm font-bold ${color}`}>{value}</div>
+                          <div className="text-xs text-slate-400">{label}</div>
                         </div>
-                      )
-                    })}
+                      ))}
+                    </div>
+
+                    {/* Liste des ingrédients */}
+                    <div>
+                      {recipe.ingredients.map((ri, idx) => {
+                        const label = ri.type === 'ingredient'
+                          ? ingredients.find((i) => i.id === ri.ingredient_id)?.name ?? '?'
+                          : recipes.find((r) => r.id === ri.recipe_id)?.name ?? '?'
+                        const unitLabel = ri.type === 'recipe'
+                          ? 'port.'
+                          : ingredientUnitLabel(ingredients.find((i) => i.id === ri.ingredient_id)?.unit ?? 'g')
+                        const scaledQty = Math.round((ri.quantity / recipe.servings) * servings * 10) / 10
+                        return (
+                          <div key={idx} className="flex justify-between py-1.5 border-b border-slate-50 last:border-0">
+                            <span className="text-sm text-slate-700">{label}</span>
+                            <span className="text-xs text-slate-400">{scaledQty} {unitLabel}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
