@@ -53,11 +53,18 @@ export type Recipe = {
   ingredients: RecipeIngredient[]
 }
 
+export type CustomRecipe = {
+  name: string
+  servings: number
+  ingredients: RecipeIngredient[]
+}
+
 export type MealItem = {
   id: string
   type: 'ingredient' | 'recipe'
   ref_id: string
   quantity: number // grammes pour ingredient, nb portions pour recipe
+  custom_recipe?: CustomRecipe // version modifiée pour ce jour uniquement
 }
 
 export const MEAL_TYPES = ['plat', 'collation', 'boisson'] as const

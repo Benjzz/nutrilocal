@@ -82,8 +82,11 @@ export function calculateItemMacros(
     if (!ing) return { calories: 0, proteins: 0, carbs: 0, fats: 0 }
     return calculateIngredientMacros(ing, item.quantity)
   } else {
-    const recipe = recipes.find((r) => r.id === item.ref_id)
-    if (!recipe) return { calories: 0, proteins: 0, carbs: 0, fats: 0 }
+    const base = recipes.find((r) => r.id === item.ref_id)
+    if (!base && !item.custom_recipe) return { calories: 0, proteins: 0, carbs: 0, fats: 0 }
+    const recipe = item.custom_recipe
+      ? { id: item.ref_id, ...item.custom_recipe }
+      : base!
     return calculateRecipeMacros(recipe, ingredients, recipes, item.quantity)
   }
 }
