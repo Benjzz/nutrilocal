@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Plus, Pencil, Trash2, X, Check, ChevronDown, ChevronUp, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Check, ChevronDown, ChevronUp, Search, Share2 } from 'lucide-react'
 import { useApp } from '@/context/AppContext'
 import { Recipe, RecipeIngredient } from '@/lib/types'
 import { calculateRecipeMacros, ingredientUnitLabel, ingredientDefaultQty } from '@/lib/utils'
@@ -15,7 +15,20 @@ type RecipeForm = {
 const EMPTY_FORM: RecipeForm = { name: '', servings: 1, ingredients: [] }
 
 export default function RecettesPage() {
-  const { recipes, ingredients, addRecipe, updateRecipe, deleteRecipe } = useApp()
+  const { recipes, ingredients, addRecipe, updateRecipe, deleteRecipe, shareRecipe } = useApp()
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+
+  async function handleShare(recipeId: string) {
+    const url = await shareRecipe(recipeId)
+    if (!url) return
+    try {
+      await navigator.clipboard.writeText(url)
+    } catch {
+      // fallback si clipboard API non disponible
+    }
+    setCopiedId(recipeId)
+    setTimeout(() => setCopiedId(null), 2500)
+  }
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<Recipe | null>(null)
   const [adding, setAdding] = useState(false)
@@ -305,6 +318,15 @@ export default function RecettesPage() {
                   <div className="flex items-center gap-1">
                     <button onClick={(e) => { e.stopPropagation(); openEdit(recipe) }} className="p-2 text-slate-400 hover:text-blue-500">
                       <Pencil size={14} />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleShare(recipe.id) }}
+                      className="p-2 text-slate-400 hover:text-green-500 relative"
+                      title="Partager"
+                    >
+                      {copiedId === recipe.id
+                        ? <Check size={14} className="text-green-500" />
+                        : <Share2 size={14} />}
                     </button>
                     <button onClick={(e) => { e.stopPropagation(); deleteRecipe(recipe.id) }} className="p-2 text-slate-400 hover:text-red-400">
                       <Trash2 size={14} />

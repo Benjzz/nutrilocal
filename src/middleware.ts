@@ -29,8 +29,9 @@ export async function middleware(request: NextRequest) {
 
   const isLoginPage = request.nextUrl.pathname === '/login'
   const isAuthRoute = request.nextUrl.pathname.startsWith('/auth')
+  const isSharedRecipe = request.nextUrl.pathname.startsWith('/recette')
 
-  if (!user && !isLoginPage && !isAuthRoute) {
+  if (!user && !isLoginPage && !isAuthRoute && !isSharedRecipe) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)

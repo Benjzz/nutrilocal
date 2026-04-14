@@ -43,6 +43,9 @@ type AppContextType = {
   updateRecipe: (recipe: Recipe) => Promise<void>
   deleteRecipe: (id: string) => Promise<void>
 
+  // Partage
+  shareRecipe: (recipeId: string) => Promise<string | null>
+
   // Log du jour
   currentDate: string
   setCurrentDate: (date: string) => void
@@ -212,6 +215,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [supabase, refreshRecipes]
   )
 
+  // ─── Partage ──────────────────────────────────────────────────────────────
+
+  const shareRecipe = useCallback(
+    async (recipeId: string): Promise<string | null> => {
+      const recipe = recipes.find((r) => r.id === recipeId)
+      if (!recipe) return null
+      const { data, error } = await supabase
+        .from('shared_recipes')
+        .insert({ recipe_data: recipe, created_by: session?.user.id })
+        .select('id')
+        .single()
+      if (error || !data) return null
+      return `${window.location.origin}/recette/${data.id}`
+    },
+    [supabase, recipes, session]
+  )
+
   // ─── Log du jour ──────────────────────────────────────────────────────────
 
   const refreshDayLog = useCallback(async () => {
@@ -348,6 +368,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         refreshDayLog,
         setDayType,
         saveDayLog,
+        shareRecipe,
         loading,
       }}
     >
