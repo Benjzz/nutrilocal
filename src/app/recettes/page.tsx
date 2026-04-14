@@ -17,14 +17,33 @@ const EMPTY_FORM: RecipeForm = { name: '', servings: 1, ingredients: [] }
 export default function RecettesPage() {
   const { recipes, ingredients, addRecipe, updateRecipe, deleteRecipe, shareRecipe } = useApp()
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [sharingId, setSharingId] = useState<string | null>(null)
+  const [shareErrorId, setShareErrorId] = useState<string | null>(null)
 
   async function handleShare(recipeId: string) {
+    setSharingId(recipeId)
     const url = await shareRecipe(recipeId)
-    if (!url) return
+    setSharingId(null)
+    if (!url) {
+      setShareErrorId(recipeId)
+      setTimeout(() => setShareErrorId(null), 3000)
+      return
+    }
+    // Partage natif sur mobile si disponible
+    if (navigator.share) {
+      try {
+        await navigator.share({ url })
+        setCopiedId(recipeId)
+        setTimeout(() => setCopiedId(null), 2500)
+        return
+      } catch {
+        // annulé par l'utilisateur, on tombe sur le clipboard
+      }
+    }
     try {
       await navigator.clipboard.writeText(url)
     } catch {
-      // fallback si clipboard API non disponible
+      // clipboard non disponible
     }
     setCopiedId(recipeId)
     setTimeout(() => setCopiedId(null), 2500)
@@ -321,11 +340,16 @@ export default function RecettesPage() {
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleShare(recipe.id) }}
-                      className="p-2 text-slate-400 hover:text-green-500 relative"
+                      disabled={sharingId === recipe.id}
+                      className="p-2 text-slate-400 hover:text-green-500 disabled:opacity-50"
                       title="Partager"
                     >
                       {copiedId === recipe.id
                         ? <Check size={14} className="text-green-500" />
+                        : shareErrorId === recipe.id
+                        ? <span className="text-[9px] text-red-400 font-medium">Err</span>
+                        : sharingId === recipe.id
+                        ? <div className="w-3.5 h-3.5 border border-slate-400 border-t-transparent rounded-full animate-spin" />
                         : <Share2 size={14} />}
                     </button>
                     <button onClick={(e) => { e.stopPropagation(); deleteRecipe(recipe.id) }} className="p-2 text-slate-400 hover:text-red-400">
