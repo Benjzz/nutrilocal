@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react'
 import { Plus, Pencil, Trash2, X, Check, ChevronDown, ChevronUp, Search, Share2 } from 'lucide-react'
 import { useApp } from '@/context/AppContext'
 import { Recipe, RecipeIngredient } from '@/lib/types'
-import { calculateRecipeMacros, ingredientUnitLabel, ingredientDefaultQty } from '@/lib/utils'
+import { calculateRecipeMacros, calculateIngredientMacros, ingredientUnitLabel, ingredientDefaultQty } from '@/lib/utils'
 
 type RecipeForm = {
   name: string
@@ -392,7 +392,7 @@ export default function RecettesPage() {
                       ))}
                     </div>
 
-                    {/* Liste des ingrédients */}
+                    {/* Liste des ingrédients avec macros */}
                     <div>
                       {recipe.ingredients.map((ri, idx) => {
                         const label = ri.type === 'ingredient'
@@ -402,10 +402,24 @@ export default function RecettesPage() {
                           ? 'port.'
                           : ingredientUnitLabel(ingredients.find((i) => i.id === ri.ingredient_id)?.unit ?? 'g')
                         const scaledQty = Math.round((ri.quantity / recipe.servings) * servings * 10) / 10
+                        const scaledRi = { ...ri, quantity: (ri.quantity / recipe.servings) * servings }
+                        const itemMacros = ri.type === 'ingredient'
+                          ? (() => { const ing = ingredients.find((i) => i.id === ri.ingredient_id); return ing ? calculateIngredientMacros(ing, scaledRi.quantity) : null })()
+                          : (() => { const sub = recipes.find((r) => r.id === ri.recipe_id); return sub ? calculateRecipeMacros(sub, ingredients, recipes, scaledRi.quantity) : null })()
                         return (
-                          <div key={idx} className="flex justify-between py-1.5 border-b border-slate-50 last:border-0">
-                            <span className="text-sm text-slate-700">{label}</span>
-                            <span className="text-xs text-slate-400">{scaledQty} {unitLabel}</span>
+                          <div key={idx} className="py-2 border-b border-slate-50 last:border-0">
+                            <div className="flex justify-between items-baseline">
+                              <span className="text-sm text-slate-700 font-medium">{label}</span>
+                              <span className="text-xs text-slate-400">{scaledQty} {unitLabel}</span>
+                            </div>
+                            {itemMacros && (
+                              <p className="text-xs text-slate-400 mt-0.5">
+                                <span className="text-orange-400">{itemMacros.calories} kcal</span>
+                                {' · '}P <span className="text-blue-400">{itemMacros.proteins}g</span>
+                                {' · '}G <span className="text-amber-400">{itemMacros.carbs}g</span>
+                                {' · '}L <span className="text-pink-400">{itemMacros.fats}g</span>
+                              </p>
+                            )}
                           </div>
                         )
                       })}
