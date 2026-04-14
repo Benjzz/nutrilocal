@@ -21,9 +21,26 @@ export default function CalendrierPage() {
   const supabase = createClient()
 
   const today = new Date()
+  const todayStr = formatDate(today)
+
   const [viewYear, setViewYear] = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth())
   const [monthLogs, setMonthLogs] = useState<DayLog[]>([])
+  const [weekLogs, setWeekLogs] = useState<DayLog[]>([])
+
+  // Dates de la semaine en cours (lundi → dimanche)
+  const weekDates = useMemo(() => {
+    const dow = today.getDay()
+    const diff = dow === 0 ? -6 : 1 - dow
+    const monday = new Date(today)
+    monday.setDate(today.getDate() + diff)
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday)
+      d.setDate(monday.getDate() + i)
+      return formatDate(d)
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayStr])
 
   // Charger les logs du mois affiché
   useEffect(() => {
@@ -43,19 +60,42 @@ export default function CalendrierPage() {
       })
   }, [activeProfileId, viewYear, viewMonth, supabase])
 
+  // Charger les logs de la semaine en cours
+  useEffect(() => {
+    if (!activeProfileId || weekDates.length === 0) return
+    supabase
+      .from('day_logs')
+      .select('*')
+      .eq('profile_id', activeProfileId)
+      .gte('date', weekDates[0])
+      .lte('date', weekDates[6])
+      .then(({ data }) => {
+        if (data) setWeekLogs(data as DayLog[])
+      })
+  }, [activeProfileId, weekDates, supabase])
+
   const logByDate = useMemo(() => {
     const map = new Map<string, DayLog>()
     for (const log of monthLogs) map.set(log.date, log)
     return map
   }, [monthLogs])
 
-  function getCaloriesForDate(dateStr: string): number | null {
-    const log = logByDate.get(dateStr)
+  const weekLogByDate = useMemo(() => {
+    const map = new Map<string, DayLog>()
+    for (const log of weekLogs) map.set(log.date, log)
+    return map
+  }, [weekLogs])
+
+  function getCaloriesForLog(log: DayLog | undefined): number | null {
     if (!log || log.meals.length === 0) return null
-    const allMacros = log.meals.flatMap((m) =>
-      m.items.map((item) => calculateItemMacros(item, ingredients, recipes))
-    )
-    return sumMacros(allMacros).calories
+    const total = sumMacros(
+      log.meals.flatMap((m) => m.items.map((item) => calculateItemMacros(item, ingredients, recipes)))
+    ).calories
+    return total || null
+  }
+
+  function getCaloriesForDate(dateStr: string): number | null {
+    return getCaloriesForLog(logByDate.get(dateStr))
   }
 
   function navigateMonth(delta: number) {
@@ -71,13 +111,11 @@ export default function CalendrierPage() {
   const calendarDays = useMemo(() => {
     const firstDay = new Date(viewYear, viewMonth, 1)
     const lastDay = new Date(viewYear, viewMonth + 1, 0)
-    // Lundi = 0, ..., Dimanche = 6
     let startDow = firstDay.getDay() - 1
     if (startDow < 0) startDow = 6
     const days: (number | null)[] = []
     for (let i = 0; i < startDow; i++) days.push(null)
     for (let d = 1; d <= lastDay.getDate(); d++) days.push(d)
-    // Compléter la grille à un multiple de 7
     while (days.length % 7 !== 0) days.push(null)
     return days
   }, [viewYear, viewMonth])
@@ -88,11 +126,56 @@ export default function CalendrierPage() {
     router.push('/')
   }
 
-  const todayStr = formatDate(today)
+  // Données semaine pour le graphique
+  const weekCalories = weekDates.map((d) => getCaloriesForLog(weekLogByDate.get(d)))
+  const weekMax = Math.max(...weekCalories.filter((c): c is number => c !== null), 1)
 
   return (
     <div className="px-4 pt-5 pb-4 space-y-4">
       <ProfileSwitcher />
+
+      {/* Graphique semaine en cours */}
+      <div className="bg-white rounded-2xl shadow-sm p-4">
+        <h3 className="text-sm font-semibold text-slate-700 mb-4">Semaine en cours</h3>
+        <div className="flex items-end gap-1.5" style={{ height: 100 }}>
+          {weekDates.map((dateStr, i) => {
+            const cal = weekCalories[i]
+            const isToday = dateStr === todayStr
+            const barHeight = cal ? Math.max((cal / weekMax) * 80, 6) : 0
+            const isPast = dateStr < todayStr
+
+            return (
+              <div
+                key={dateStr}
+                className="flex-1 flex flex-col items-center justify-end gap-1 h-full cursor-pointer"
+                onClick={() => { setCurrentDate(dateStr); router.push('/') }}
+              >
+                {/* Valeur */}
+                <span className={`text-[9px] font-medium leading-none ${cal ? (isToday ? 'text-green-500' : 'text-slate-500') : 'text-transparent'}`}>
+                  {cal ?? 0}
+                </span>
+                {/* Barre */}
+                <div className="w-full flex flex-col justify-end" style={{ height: 80 }}>
+                  <div
+                    className={`w-full rounded-t-md transition-all ${
+                      isToday
+                        ? 'bg-green-500'
+                        : cal
+                        ? isPast ? 'bg-slate-300' : 'bg-slate-200'
+                        : 'bg-slate-100'
+                    }`}
+                    style={{ height: barHeight || 4, opacity: barHeight ? 1 : 0.4 }}
+                  />
+                </div>
+                {/* Jour */}
+                <span className={`text-[10px] font-medium ${isToday ? 'text-green-500' : 'text-slate-400'}`}>
+                  {DAYS_FR[i]}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
 
       {/* Month navigation */}
       <div className="flex items-center justify-between">
@@ -109,7 +192,6 @@ export default function CalendrierPage() {
 
       {/* Calendar grid */}
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-        {/* Day headers */}
         <div className="grid grid-cols-7 border-b border-slate-100">
           {DAYS_FR.map((d) => (
             <div key={d} className="text-center text-xs font-medium text-slate-400 py-2">
@@ -118,7 +200,6 @@ export default function CalendrierPage() {
           ))}
         </div>
 
-        {/* Days */}
         <div className="grid grid-cols-7">
           {calendarDays.map((day, idx) => {
             if (!day) {
@@ -162,7 +243,7 @@ export default function CalendrierPage() {
         </div>
       </div>
 
-      {/* Month summary */}
+      {/* Résumé du mois (sans moyenne calories) */}
       {monthLogs.length > 0 && (
         <div className="bg-white rounded-2xl shadow-sm p-4">
           <h3 className="text-sm font-semibold text-slate-700 mb-3">Résumé du mois</h3>
@@ -175,22 +256,6 @@ export default function CalendrierPage() {
               <p className="text-xs text-slate-500">Entraînements</p>
               <p className="text-xl font-bold text-green-500">
                 {monthLogs.filter((l) => l.day_type === 'training').length}
-              </p>
-            </div>
-            <div className="bg-slate-50 rounded-xl p-3 col-span-2">
-              <p className="text-xs text-slate-500">Moy. calories / jour</p>
-              <p className="text-xl font-bold text-orange-500">
-                {Math.round(
-                  monthLogs.reduce((acc, log) => {
-                    const cals = sumMacros(
-                      log.meals.flatMap((m) =>
-                        m.items.map((item) => calculateItemMacros(item, ingredients, recipes))
-                      )
-                    ).calories
-                    return acc + cals
-                  }, 0) / monthLogs.length
-                )}{' '}
-                kcal
               </p>
             </div>
           </div>
