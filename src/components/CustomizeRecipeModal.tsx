@@ -99,11 +99,11 @@ export default function CustomizeRecipeModal({ item, onSave, onReset, onClose }:
     <div className="fixed inset-0 z-50 flex items-end" onClick={onClose}>
       <div
         className="w-full max-w-lg mx-auto bg-white rounded-t-2xl shadow-2xl flex flex-col"
-        style={{ maxHeight: '90vh' }}
+        style={{ height: '85vh' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-100 flex-shrink-0">
+        <div className="flex items-center justify-between p-4 border-b border-slate-100 shrink-0">
           <div>
             <h2 className="text-base font-semibold text-slate-800">Personnaliser</h2>
             <p className="text-xs text-slate-400">{recipeName} · pour aujourd&apos;hui seulement</p>
@@ -220,7 +220,7 @@ export default function CustomizeRecipeModal({ item, onSave, onReset, onClose }:
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-100 flex-shrink-0 space-y-2">
+        <div className="p-4 border-t border-slate-100 shrink-0 space-y-2">
           <button
             onClick={handleSave}
             className="w-full py-3 bg-green-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2"
