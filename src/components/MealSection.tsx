@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Plus, Trash2, ChevronDown, ChevronUp, Pencil } from 'lucide-react'
 import { Meal, MealItem, CustomRecipe, MEAL_TYPE_LABELS } from '@/lib/types'
 import { useApp } from '@/context/AppContext'
-import { calculateItemMacros, sumMacros } from '@/lib/utils'
+import { calculateItemMacros, calculateIngredientMacros, calculateRecipeMacros, sumMacros, ingredientUnitLabel } from '@/lib/utils'
 import AddFoodModal from './AddFoodModal'
 import CustomizeRecipeModal from './CustomizeRecipeModal'
 import { generateId } from '@/lib/utils'
@@ -20,6 +20,7 @@ export default function MealSection({ meal, onUpdate, onDelete }: MealSectionPro
   const [open, setOpen] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [customizingItem, setCustomizingItem] = useState<MealItem | null>(null)
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null)
 
   const itemMacros = meal.items.map((item) =>
     calculateItemMacros(item, ingredients, recipes)
@@ -102,42 +103,89 @@ export default function MealSection({ meal, onUpdate, onDelete }: MealSectionPro
             {meal.items.map((item, idx) => {
               const macros = itemMacros[idx]
               const isCustomized = item.type === 'recipe' && !!item.custom_recipe
+              const isRecipe = item.type === 'recipe'
+              const itemExpanded = expandedItemId === item.id
+              const recipeSource = isRecipe
+                ? (item.custom_recipe
+                    ? { id: item.ref_id, ...item.custom_recipe }
+                    : recipes.find((r) => r.id === item.ref_id))
+                : null
 
               return (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between px-4 py-2.5 border-b border-slate-50 last:border-0"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <p className="text-sm text-slate-700 truncate">{getItemLabel(item)}</p>
-                      {isCustomized && (
-                        <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600 flex-shrink-0">
-                          modifiée
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-400">
-                      {macros.calories} kcal · P {macros.proteins}g · G {macros.carbs}g · L {macros.fats}g
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-0.5 shrink-0 ml-2">
-                    {item.type === 'recipe' && (
-                      <button
-                        onClick={() => setCustomizingItem(item)}
-                        className="p-1.5 text-slate-300 hover:text-amber-400"
-                        title="Personnaliser pour aujourd'hui"
-                      >
-                        <Pencil size={13} />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => removeItem(item.id)}
-                      className="p-1.5 text-slate-300 hover:text-red-400"
+                <div key={item.id} className="border-b border-slate-50 last:border-0">
+                  <div className="flex items-center justify-between px-4 py-2.5">
+                    <div
+                      className={`flex-1 min-w-0 ${isRecipe ? 'cursor-pointer' : ''}`}
+                      onClick={() => isRecipe && setExpandedItemId(itemExpanded ? null : item.id)}
                     >
-                      <Trash2 size={13} />
-                    </button>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="text-sm text-slate-700 truncate">{getItemLabel(item)}</p>
+                        {isCustomized && (
+                          <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600 shrink-0">
+                            modifiée
+                          </span>
+                        )}
+                        {isRecipe && (
+                          itemExpanded
+                            ? <ChevronUp size={11} className="text-slate-300 shrink-0" />
+                            : <ChevronDown size={11} className="text-slate-300 shrink-0" />
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400">
+                        {macros.calories} kcal · P {macros.proteins}g · G {macros.carbs}g · L {macros.fats}g
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-0.5 shrink-0 ml-2">
+                      {isRecipe && (
+                        <button
+                          onClick={() => setCustomizingItem(item)}
+                          className="p-1.5 text-slate-300 hover:text-amber-400"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => removeItem(item.id)}
+                        className="p-1.5 text-slate-300 hover:text-red-400"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Détail des ingrédients de la recette */}
+                  {itemExpanded && recipeSource && (
+                    <div className="bg-slate-50 px-4 pb-2 space-y-0">
+                      {recipeSource.ingredients.map((ri, i) => {
+                        const scaledQty = (ri.quantity / recipeSource.servings) * item.quantity
+                        const ingLabel = ri.type === 'ingredient'
+                          ? ingredients.find((g) => g.id === ri.ingredient_id)?.name ?? '?'
+                          : recipes.find((r) => r.id === ri.recipe_id)?.name ?? '?'
+                        const unitLabel = ri.type === 'recipe'
+                          ? 'port.'
+                          : ingredientUnitLabel(ingredients.find((g) => g.id === ri.ingredient_id)?.unit ?? 'g')
+                        const ingMacros = ri.type === 'ingredient'
+                          ? (() => { const ing = ingredients.find((g) => g.id === ri.ingredient_id); return ing ? calculateIngredientMacros(ing, scaledQty) : null })()
+                          : (() => { const sub = recipes.find((r) => r.id === ri.recipe_id); return sub ? calculateRecipeMacros(sub, ingredients, recipes, scaledQty) : null })()
+                        return (
+                          <div key={i} className="py-1.5 border-b border-slate-100 last:border-0">
+                            <div className="flex justify-between items-baseline">
+                              <span className="text-xs text-slate-600 font-medium">{ingLabel}</span>
+                              <span className="text-xs text-slate-400">{Math.round(scaledQty * 10) / 10} {unitLabel}</span>
+                            </div>
+                            {ingMacros && (
+                              <p className="text-[10px] text-slate-400 mt-0.5">
+                                <span className="text-orange-400">{ingMacros.calories} kcal</span>
+                                {' · '}P <span className="text-blue-400">{ingMacros.proteins}g</span>
+                                {' · '}G <span className="text-amber-400">{ingMacros.carbs}g</span>
+                                {' · '}L <span className="text-pink-400">{ingMacros.fats}g</span>
+                              </p>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               )
             })}
