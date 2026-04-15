@@ -1,13 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Trash2, ChevronDown, ChevronUp, Pencil } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, ChevronUp, Pencil, GripVertical } from 'lucide-react'
 import { Meal, MealItem, CustomRecipe, MEAL_TYPE_LABELS } from '@/lib/types'
 import { useApp } from '@/context/AppContext'
 import { calculateItemMacros, calculateIngredientMacros, calculateRecipeMacros, sumMacros, ingredientUnitLabel } from '@/lib/utils'
 import AddFoodModal from './AddFoodModal'
 import CustomizeRecipeModal from './CustomizeRecipeModal'
 import { generateId } from '@/lib/utils'
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 type MealSectionProps = {
   meal: Meal
@@ -16,11 +18,20 @@ type MealSectionProps = {
 }
 
 export default function MealSection({ meal, onUpdate, onDelete }: MealSectionProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: meal.id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
   const { ingredients, recipes } = useApp()
   const [open, setOpen] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [customizingItem, setCustomizingItem] = useState<MealItem | null>(null)
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null)
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [editingQty, setEditingQty] = useState('')
 
   const itemMacros = meal.items.map((item) =>
     calculateItemMacros(item, ingredients, recipes)
@@ -56,6 +67,22 @@ export default function MealSection({ meal, onUpdate, onDelete }: MealSectionPro
     setCustomizingItem(null)
   }
 
+  function startEditQty(item: MealItem) {
+    setEditingItemId(item.id)
+    setEditingQty(String(item.quantity))
+  }
+
+  function commitEditQty(itemId: string) {
+    const qty = parseFloat(editingQty)
+    if (!isNaN(qty) && qty > 0) {
+      onUpdate({
+        ...meal,
+        items: meal.items.map((i) => i.id === itemId ? { ...i, quantity: qty } : i),
+      })
+    }
+    setEditingItemId(null)
+  }
+
   function handleCustomizeReset(itemId: string) {
     onUpdate({
       ...meal,
@@ -66,13 +93,21 @@ export default function MealSection({ meal, onUpdate, onDelete }: MealSectionPro
 
   return (
     <>
-      <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+      <div ref={setNodeRef} style={style} className="bg-white rounded-2xl overflow-hidden shadow-sm">
         {/* Header du repas */}
         <div
           className="w-full flex items-center justify-between px-4 py-3 cursor-pointer"
           onClick={() => setOpen(!open)}
         >
-          <div className="text-left">
+          <div
+            className="p-1 -ml-1 mr-1 text-slate-300 cursor-grab active:cursor-grabbing shrink-0 touch-none"
+            {...attributes}
+            {...listeners}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <GripVertical size={16} />
+          </div>
+          <div className="text-left flex-1">
             <div className="flex items-center gap-1.5">
               <p className="font-semibold text-slate-800 text-sm">{meal.name}</p>
               <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
@@ -119,7 +154,23 @@ export default function MealSection({ meal, onUpdate, onDelete }: MealSectionPro
                       onClick={() => isRecipe && setExpandedItemId(itemExpanded ? null : item.id)}
                     >
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <p className="text-sm text-slate-700 truncate">{getItemLabel(item)}</p>
+                        {editingItemId === item.id ? (
+                          <input
+                            type="number"
+                            value={editingQty}
+                            onChange={(e) => setEditingQty(e.target.value)}
+                            onBlur={() => commitEditQty(item.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') commitEditQty(item.id)
+                              if (e.key === 'Escape') setEditingItemId(null)
+                            }}
+                            className="w-20 border border-green-400 rounded-lg px-2 py-0.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-green-300"
+                            autoFocus
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <p className="text-sm text-slate-700 truncate">{getItemLabel(item)}</p>
+                        )}
                         {isCustomized && (
                           <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600 shrink-0">
                             modifiée
@@ -136,14 +187,16 @@ export default function MealSection({ meal, onUpdate, onDelete }: MealSectionPro
                       </p>
                     </div>
                     <div className="flex items-center gap-0.5 shrink-0 ml-2">
-                      {isRecipe && (
-                        <button
-                          onClick={() => setCustomizingItem(item)}
-                          className="p-1.5 text-slate-300 hover:text-amber-400"
-                        >
-                          <Pencil size={13} />
-                        </button>
-                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (isRecipe) setCustomizingItem(item)
+                          else startEditQty(item)
+                        }}
+                        className="p-1.5 text-slate-300 hover:text-amber-400"
+                      >
+                        <Pencil size={13} />
+                      </button>
                       <button
                         onClick={() => removeItem(item.id)}
                         className="p-1.5 text-slate-300 hover:text-red-400"

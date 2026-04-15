@@ -4,7 +4,14 @@ import { useState, useMemo } from 'react'
 import { X, Check, Plus, Search, RotateCcw } from 'lucide-react'
 import { useApp } from '@/context/AppContext'
 import { MealItem, CustomRecipe, RecipeIngredient } from '@/lib/types'
-import { ingredientUnitLabel, ingredientDefaultQty } from '@/lib/utils'
+import { ingredientUnitLabel, ingredientDefaultQty, calculateIngredientMacros, calculateRecipeMacros } from '@/lib/utils'
+
+const MACRO_COLS = [
+  { key: 'calories' as const, label: 'Kcal', color: 'text-orange-500', bg: 'bg-orange-50' },
+  { key: 'proteins' as const, label: 'Prot', color: 'text-blue-500', bg: 'bg-blue-50' },
+  { key: 'carbs' as const, label: 'Gluc', color: 'text-amber-500', bg: 'bg-amber-50' },
+  { key: 'fats' as const, label: 'Lip', color: 'text-pink-500', bg: 'bg-pink-50' },
+]
 
 type Props = {
   item: MealItem
@@ -31,6 +38,47 @@ export default function CustomizeRecipeModal({ item, onSave, onReset, onClose }:
   const [pickerSearch, setPickerSearch] = useState('')
   const [showPicker, setShowPicker] = useState(false)
   const [pickerTab, setPickerTab] = useState<'ingredient' | 'recipe'>('ingredient')
+
+  // Macros calculées réactivement depuis form
+  const ingMacros = useMemo(() => {
+    return form.ingredients.map((ri) => {
+      if (ri.type === 'ingredient') {
+        const ing = ingredients.find((i) => i.id === ri.ingredient_id)
+        if (!ing) return { calories: 0, proteins: 0, carbs: 0, fats: 0 }
+        return calculateIngredientMacros(ing, ri.quantity)
+      } else {
+        const sub = recipes.find((r) => r.id === ri.recipe_id)
+        if (!sub) return { calories: 0, proteins: 0, carbs: 0, fats: 0 }
+        return calculateRecipeMacros(sub, ingredients, recipes, ri.quantity)
+      }
+    })
+  }, [form.ingredients, ingredients, recipes])
+
+  const totalMacros = useMemo(() => {
+    const t = { calories: 0, proteins: 0, carbs: 0, fats: 0 }
+    for (const m of ingMacros) {
+      t.calories += m.calories
+      t.proteins += m.proteins
+      t.carbs += m.carbs
+      t.fats += m.fats
+    }
+    return {
+      calories: Math.round(t.calories),
+      proteins: Math.round(t.proteins * 10) / 10,
+      carbs: Math.round(t.carbs * 10) / 10,
+      fats: Math.round(t.fats * 10) / 10,
+    }
+  }, [ingMacros])
+
+  const perServingMacros = useMemo(() => {
+    const s = form.servings || 1
+    return {
+      calories: Math.round(totalMacros.calories / s),
+      proteins: Math.round((totalMacros.proteins / s) * 10) / 10,
+      carbs: Math.round((totalMacros.carbs / s) * 10) / 10,
+      fats: Math.round((totalMacros.fats / s) * 10) / 10,
+    }
+  }, [totalMacros, form.servings])
 
   const filteredIngredients = useMemo(
     () => ingredients.filter((i) => i.name.toLowerCase().includes(pickerSearch.toLowerCase())),
@@ -126,6 +174,25 @@ export default function CustomizeRecipeModal({ item, onSave, onReset, onClose }:
             />
           </div>
 
+          {/* Résumé macros */}
+          {form.ingredients.length > 0 && (
+            <div className="space-y-1">
+              <div className="grid grid-cols-4 gap-1.5">
+                {MACRO_COLS.map(({ key, label, color, bg }) => (
+                  <div key={key} className={`${bg} rounded-xl p-2 text-center`}>
+                    <div className={`text-sm font-bold ${color}`}>{totalMacros[key]}</div>
+                    <div className="text-[10px] text-slate-400">{label}</div>
+                  </div>
+                ))}
+              </div>
+              {form.servings > 1 && (
+                <p className="text-[10px] text-slate-400 text-center">
+                  Par portion : {perServingMacros.calories} kcal · P{perServingMacros.proteins} · G{perServingMacros.carbs} · L{perServingMacros.fats}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Composition */}
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -192,26 +259,36 @@ export default function CustomizeRecipeModal({ item, onSave, onReset, onClose }:
               </div>
             )}
 
-            {form.ingredients.map((ri, index) => (
-              <div key={index} className="flex items-center gap-2 mb-2">
-                <span className="flex-1 text-sm text-slate-700 truncate">{getLabel(ri)}</span>
-                <input
-                  type="number"
-                  value={ri.quantity || ''}
-                  onChange={(e) => updateQty(index, parseFloat(e.target.value) || 0)}
-                  className="w-20 border border-slate-200 rounded-lg px-2 py-1 text-sm text-center focus:outline-none"
-                  placeholder="0"
-                />
-                <span className="text-xs text-slate-400 w-12 text-right">
-                  {ri.type === 'recipe'
-                    ? 'port.'
-                    : ingredientUnitLabel(ingredients.find((i) => i.id === ri.ingredient_id)?.unit ?? 'g')}
-                </span>
-                <button onClick={() => removeItem(index)} className="text-slate-300 hover:text-red-400">
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
+            {form.ingredients.map((ri, index) => {
+              const m = ingMacros[index]
+              return (
+                <div key={index} className="mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex-1 text-sm text-slate-700 truncate">{getLabel(ri)}</span>
+                    <input
+                      type="number"
+                      value={ri.quantity || ''}
+                      onChange={(e) => updateQty(index, parseFloat(e.target.value) || 0)}
+                      className="w-20 border border-slate-200 rounded-lg px-2 py-1 text-sm text-center focus:outline-none"
+                      placeholder="0"
+                    />
+                    <span className="text-xs text-slate-400 w-12 text-right">
+                      {ri.type === 'recipe'
+                        ? 'port.'
+                        : ingredientUnitLabel(ingredients.find((i) => i.id === ri.ingredient_id)?.unit ?? 'g')}
+                    </span>
+                    <button onClick={() => removeItem(index)} className="text-slate-300 hover:text-red-400">
+                      <X size={14} />
+                    </button>
+                  </div>
+                  {m && (
+                    <p className="text-[10px] text-slate-400 pl-0 mt-0.5">
+                      <span className="text-orange-400">{m.calories}</span> kcal · P{m.proteins} · G{m.carbs} · L{m.fats}
+                    </p>
+                  )}
+                </div>
+              )
+            })}
 
             {form.ingredients.length === 0 && (
               <p className="text-xs text-slate-400 text-center py-2">Aucun élément</p>

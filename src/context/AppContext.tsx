@@ -241,7 +241,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .select('*')
       .eq('profile_id', activeProfileId)
       .eq('date', currentDate)
-      .single()
+      .maybeSingle()
 
     if (data) {
       setDayLog({
@@ -263,7 +263,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         .select('id')
         .eq('profile_id', log.profile_id)
         .eq('date', log.date)
-        .single()
+        .maybeSingle()
 
       if (existing) {
         await supabase

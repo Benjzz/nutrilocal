@@ -9,6 +9,20 @@ import MacroBar from '@/components/MacroBar'
 import MealSection from '@/components/MealSection'
 import { DayLog, Meal, MealType, MEAL_TYPE_LABELS } from '@/lib/types'
 import { calculateItemMacros, sumMacros, frenchDate, generateId, todayStr, formatDate } from '@/lib/utils'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable'
 
 const MEAL_PRESETS: { name: string; meal_type: MealType }[] = [
   { name: 'Petit-déjeuner', meal_type: 'plat' },
@@ -30,6 +44,22 @@ export default function JournalPage() {
     recipes,
     loading,
   } = useApp()
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 200, tolerance: 5 },
+    })
+  )
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = meals.findIndex((m) => m.id === active.id)
+    const newIndex = meals.findIndex((m) => m.id === over.id)
+    const reordered = arrayMove(meals, oldIndex, newIndex)
+    updateMeals(reordered)
+  }
 
   const [addingMeal, setAddingMeal] = useState(false)
   const [customMealName, setCustomMealName] = useState('')
@@ -151,11 +181,15 @@ export default function JournalPage() {
         </div>
       </div>
 
-      <div className="space-y-3">
-        {meals.map((meal) => (
-          <MealSection key={meal.id} meal={meal} onUpdate={updateMeal} onDelete={() => deleteMeal(meal.id)} />
-        ))}
-      </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={meals.map((m) => m.id)} strategy={verticalListSortingStrategy}>
+          <div className="space-y-3">
+            {meals.map((meal) => (
+              <MealSection key={meal.id} meal={meal} onUpdate={updateMeal} onDelete={() => deleteMeal(meal.id)} />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       {addingMeal ? (
         <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">

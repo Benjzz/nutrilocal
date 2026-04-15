@@ -7,8 +7,8 @@ import { BookOpen, Calendar, Users, Library, User } from 'lucide-react'
 const navItems = [
   { href: '/', label: 'Journal', icon: BookOpen },
   { href: '/calendrier', label: 'Calendrier', icon: Calendar },
-  { href: '/amis', label: 'Amis', icon: Users },
   { href: '/bibliotheque', label: 'Biblio', icon: Library },
+  { href: '/amis', label: 'Amis', icon: Users },
   { href: '/profils', label: 'Profils', icon: User },
 ]
 
