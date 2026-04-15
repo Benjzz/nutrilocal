@@ -2,20 +2,20 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, Calendar, Apple, ChefHat, User } from 'lucide-react'
+import { BookOpen, Calendar, Users, Library, User } from 'lucide-react'
 
 const navItems = [
   { href: '/', label: 'Journal', icon: BookOpen },
   { href: '/calendrier', label: 'Calendrier', icon: Calendar },
-  { href: '/aliments', label: 'Aliments', icon: Apple },
-  { href: '/recettes', label: 'Recettes', icon: ChefHat },
+  { href: '/amis', label: 'Amis', icon: Users },
+  { href: '/bibliotheque', label: 'Biblio', icon: Library },
   { href: '/profils', label: 'Profils', icon: User },
 ]
 
 export default function BottomNav() {
   const pathname = usePathname()
 
-  if (pathname === '/login') return null
+  if (pathname === '/login' || pathname.startsWith('/recette')) return null
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50"

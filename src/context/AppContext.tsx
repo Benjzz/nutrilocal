@@ -302,7 +302,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ─── Init et écoute de l'auth ─────────────────────────────────────────────
 
   useEffect(() => {
-    async function loadData() {
+    async function registerEmail(userId: string, email: string | undefined) {
+      if (!email) return
+      await supabase.from('user_emails').upsert(
+        { user_id: userId, email },
+        { onConflict: 'user_id' }
+      )
+    }
+
+    async function loadData(userId: string, email: string | undefined) {
+      await registerEmail(userId, email)
       setLoading(true)
       await Promise.all([refreshProfiles(), refreshIngredients(), refreshRecipes()])
       setLoading(false)
@@ -310,7 +319,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
-      if (session) loadData()
+      if (session) loadData(session.user.id, session.user.email)
       else setLoading(false)
     })
 
@@ -319,7 +328,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession)
       if (event === 'SIGNED_IN' && newSession) {
-        loadData()
+        loadData(newSession.user.id, newSession.user.email)
       } else if (event === 'SIGNED_OUT') {
         setProfiles([])
         setIngredients([])
