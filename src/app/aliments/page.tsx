@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Pencil, Trash2, Search, X, Check } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, X, Check, Download } from 'lucide-react'
 import DragScroll from '@/components/DragScroll'
 import { useApp } from '@/context/AppContext'
 import { Ingredient, INGREDIENT_CATEGORIES, IngredientCategory } from '@/lib/types'
@@ -84,19 +84,55 @@ export default function AlimentsPage() {
     closeForm()
   }
 
+  function escapeCsv(value: string | number): string {
+    const str = String(value)
+    return /[",;\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str
+  }
+
+  function handleExportCsv() {
+    const header = ['Nom', 'Catégorie', 'Calories (kcal/100)', 'Protéines (g/100)', 'Glucides (g/100)', 'Lipides (g/100)', 'Unité']
+    const rows = filtered.map((ing) => [
+      ing.name,
+      ing.category,
+      ing.calories,
+      ing.proteins,
+      ing.carbs,
+      ing.fats,
+      ing.unit,
+    ])
+    const csv = [header, ...rows].map((r) => r.map(escapeCsv).join(';')).join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'aliments.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const categories: ('Tous' | IngredientCategory)[] = ['Tous', ...INGREDIENT_CATEGORIES]
 
   return (
     <div className="px-4 pt-5 pb-4 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-bold text-slate-800">Aliments</h1>
-        <button
-          onClick={openAdd}
-          className="flex items-center gap-1.5 bg-green-500 text-white text-sm font-medium px-3 py-2 rounded-xl"
-        >
-          <Plus size={16} />
-          Ajouter
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCsv}
+            disabled={filtered.length === 0}
+            className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-600 text-sm font-medium px-3 py-2 rounded-xl disabled:opacity-40"
+          >
+            <Download size={16} />
+            Export
+          </button>
+          <button
+            onClick={openAdd}
+            className="flex items-center gap-1.5 bg-green-500 text-white text-sm font-medium px-3 py-2 rounded-xl"
+          >
+            <Plus size={16} />
+            Ajouter
+          </button>
+        </div>
       </div>
 
       {/* Search */}
